@@ -25,18 +25,24 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
+      # No setup-android step: the runner image already ships the Android SDK,
+      # and installing a second copy is what broke the earlier runs.
+      - name: Show SDK location
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          ls "$ANDROID_HOME/platforms" || true
 
       - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
 
       - name: Build debug APK
         working-directory: android
         run: |
-          chmod +x gradlew || true
-          gradle wrapper --gradle-version 8.9 || true
-          ./gradlew assembleDebug \
+          gradle assembleDebug \
             -PappHost="${{ github.event.inputs.appHost || vars.APP_HOST || 'example.com' }}" \
-            --no-daemon
+            --no-daemon --stacktrace
 
       # The TWA only drops the URL bar when this fingerprint is published at
       # https://<your-host>/.well-known/assetlinks.json — the server serves it
@@ -48,7 +54,7 @@ jobs:
             -alias androiddebugkey -storepass android -keypass android \
             | grep -A1 'SHA256:' | head -2
 
-      - uses: actions/upload-artifact@v4  # v4 is current
+      - uses: actions/upload-artifact@v4
         with:
           name: birr-apk
           path: android/app/build/outputs/apk/debug/*.apk
