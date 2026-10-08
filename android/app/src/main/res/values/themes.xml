@@ -1,0 +1,9 @@
+<resources>
+    <style name="AppTheme" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@color/twaBackground</item>
+        <item name="android:navigationBarColor">@color/twaBackground</item>
+        <item name="android:windowBackground">@color/twaBackground</item>
+    </style>
+    <!-- Translucent so the TWA hands straight over to Chrome with no flash. -->
+    <style name="AppTheme.Twa" parent="android:Theme.Translucent.NoTitleBar" />
+</resources>

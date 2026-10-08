@@ -1,0 +1,10 @@
+node_modules/
+data.db
+data.db-wal
+data.db-shm
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.apk
+.DS_Store

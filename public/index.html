@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<link rel="manifest" href="/manifest.webmanifest">
+<title>Birr — savings & expenses</title>
+<style>
+  :root{
+    --bg:#0f1115; --surface:#171a21; --surface-2:#1f232c; --line:#272c37;
+    --text:#e8eaf0; --muted:#949cad;
+    --in:#3ddc97; --out:#ff6b6b; --accent:#7aa2f7;
+    --r:14px;
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#f6f7f9; --surface:#fff; --surface-2:#f0f2f6; --line:#e3e6ec;
+           --text:#161922; --muted:#6b7385; --in:#0f9d58; --out:#d64545; --accent:#3b6fd4; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+       padding:16px 16px calc(32px + env(safe-area-inset-bottom));max-width:620px;margin-inline:auto}
+  h1{font-size:19px;margin:0;letter-spacing:-.01em}
+  .top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+  select{background:var(--surface-2);color:var(--text);border:1px solid var(--line);
+         border-radius:10px;padding:7px 10px;font:inherit;font-size:13px}
+  .pick{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+  .seg{display:flex;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:2px}
+  .seg button{background:none;border:0;color:var(--muted);font:inherit;font-size:12px;font-weight:600;
+              padding:5px 11px;border-radius:8px;margin:0;cursor:pointer}
+  .seg button.on{background:var(--surface);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.25)}
+  .tip{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);
+       border-radius:12px;padding:12px 13px;margin-bottom:8px}
+  .tip.good{border-left-color:var(--in)} .tip.alert{border-left-color:var(--out)}
+  .tip.watch{border-left-color:#e0a458}
+  .tip b{display:block;font-size:14px;font-weight:600;margin-bottom:3px}
+  .tip span{font-size:13px;color:var(--muted);line-height:1.5}
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+  .card.wide{grid-column:1/-1}
+  .label{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+  .fig{font-size:22px;font-weight:650;margin-top:5px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+  .fig.in{color:var(--in)} .fig.out{color:var(--out)}
+  .sub{font-size:12px;color:var(--muted);margin-top:3px}
+  .bars{display:flex;align-items:flex-end;gap:3px;height:52px;margin-top:10px}
+  .bars span{flex:1;background:var(--out);border-radius:2px 2px 0 0;min-height:2px;opacity:.85}
+  .cat{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+  .cat:last-child{border-bottom:0}
+  .cat .nm{flex:1;font-size:14px}
+  .meter{height:5px;background:var(--surface-2);border-radius:3px;overflow:hidden;margin-top:5px}
+  .meter i{display:block;height:100%;background:var(--accent)}
+  .amt{font-variant-numeric:tabular-nums;font-weight:600;font-size:14px}
+  h2{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);
+     margin:22px 0 9px;font-weight:600}
+  .tx{display:flex;gap:11px;align-items:center;background:var(--surface);border:1px solid var(--line);
+      border-radius:12px;padding:11px 12px;margin-bottom:7px}
+  .dot{width:7px;height:7px;border-radius:50%;flex:none}
+  .dot.credit{background:var(--in)} .dot.debit{background:var(--out)}
+  .tx .who{flex:1;min-width:0}
+  .who b{display:block;font-weight:550;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .who small{color:var(--muted);font-size:12px}
+  .tx select{font-size:11px;padding:3px 6px;border-radius:7px;max-width:112px}
+  textarea{width:100%;background:var(--surface-2);color:var(--text);border:1px solid var(--line);
+           border-radius:10px;padding:10px;font:inherit;font-size:13px;min-height:84px;resize:vertical}
+  button{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:9px 15px;
+         font:inherit;font-weight:600;font-size:14px;margin-top:9px;cursor:pointer}
+  .empty{color:var(--muted);font-size:14px;text-align:center;padding:26px 0}
+  .flash{font-size:13px;color:var(--in);margin-top:7px;min-height:17px}
+</style>
+</head>
+<body>
+  <div class="top">
+    <h1>Savings &amp; expenses</h1>
+    <div class="pick">
+      <div class="seg" id="seg">
+        <button data-p="day">Day</button>
+        <button data-p="month" class="on">Month</button>
+        <button data-p="year">Year</button>
+        <button data-p="all">All</button>
+      </div>
+      <select id="when" aria-label="Period"></select>
+    </div>
+  </div>
+
+  <div class="cards">
+    <div class="card"><div class="label">Money in</div><div class="fig in" id="f-in">—</div></div>
+    <div class="card"><div class="label">Money out</div><div class="fig out" id="f-out">—</div></div>
+    <div class="card wide">
+      <div class="label">Net saved this month</div>
+      <div class="fig" id="f-net">—</div>
+      <div class="sub" id="f-sub"></div>
+      <div class="bars" id="bars"></div>
+    </div>
+  </div>
+
+  <div id="tips-wrap" hidden>
+    <h2>Savings read-out</h2>
+    <div id="tips"></div>
+  </div>
+
+  <div id="cats-wrap" hidden>
+    <h2>Where it went</h2>
+    <div class="card" id="cats"></div>
+  </div>
+
+  <h2>Transactions</h2>
+  <div id="list"><div class="empty">Nothing yet.</div></div>
+
+  <h2>Paste a message</h2>
+  <div class="card">
+    <textarea id="paste" placeholder="Paste one or more SMS messages here. Separate several with a blank line."></textarea>
+    <button id="send">Add</button>
+    <div class="flash" id="flash"></div>
+  </div>
+
+<script src="/app.js"></script>
+</body>
+</html>
