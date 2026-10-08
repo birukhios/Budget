@@ -16,11 +16,11 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -48,7 +48,7 @@ jobs:
             -alias androiddebugkey -storepass android -keypass android \
             | grep -A1 'SHA256:' | head -2
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4  # v4 is current
         with:
           name: birr-apk
           path: android/app/build/outputs/apk/debug/*.apk
