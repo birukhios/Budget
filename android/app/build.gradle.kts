@@ -18,7 +18,6 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
-        manifestPlaceholders["hostName"] = appHost
         resValue("string", "asset_statements",
             """[{ \"relation\": [\"delegate_permission/common.handle_all_urls\"], """ +
             """\"target\": { \"namespace\": \"web\", \"site\": \"https://$appHost\" } }]""")
