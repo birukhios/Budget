@@ -73,26 +73,77 @@ object Forwarder {
         }
     }
 
+    /** Result of an inbox scan, so the UI can say where messages were lost. */
+    data class ImportResult(
+        val scanned: Int, val matched: Int, val sent: Int,
+        val senders: List<String>, val error: String? = null,
+    ) {
+        override fun toString(): String = when {
+            error != null -> "Error: $error"
+            scanned == 0 -> "No SMS found on this phone."
+            matched == 0 -> "Scanned $scanned messages, none from a known bank.\n" +
+                "Senders seen: ${senders.take(12).joinToString(", ")}"
+            sent == 0 -> "Matched $matched messages but the server did not accept them.\n" +
+                "Check the URL and token."
+            else -> "Sent $sent of $matched matched (scanned $scanned)."
+        }
+    }
+
+    /** Can we reach the server with these credentials? */
+    fun testConnection(ctx: Context): String {
+        val (base, token) = config(ctx) ?: return "Enter the URL and token first."
+        return try {
+            (URL("$base/api/ingest").openConnection() as HttpURLConnection).run {
+                requestMethod = "POST"
+                connectTimeout = 10000
+                readTimeout = 10000
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json")
+                setRequestProperty("Authorization", "Bearer $token")
+                outputStream.use { it.write("""{"messages":[]}""".toByteArray()) }
+                val code = responseCode
+                disconnect()
+                when (code) {
+                    in 200..299 -> "Connected. Server accepted the token."
+                    401 -> "Reached the server, but the token is wrong."
+                    else -> "Reached the server, got HTTP $code."
+                }
+            }
+        } catch (e: Exception) {
+            "Cannot reach $base — ${e.javaClass.simpleName}. " +
+                "Same Wi-Fi? Firewall off on the computer?"
+        }
+    }
+
     /**
      * One-time backfill of the existing inbox, so the dashboard isn't empty
      * on day one. Reads only messages from allowed senders.
      */
-    fun importInbox(ctx: Context, sinceMillis: Long = 0L): Int {
+    fun importInbox(ctx: Context, sinceMillis: Long = 0L): ImportResult {
         val cols = arrayOf("address", "body", "date")
-        val cursor = ctx.contentResolver.query(
-            Uri.parse("content://sms/inbox"), cols,
-            "date > ?", arrayOf(sinceMillis.toString()), "date ASC"
-        ) ?: return 0
+        val cursor = try {
+            ctx.contentResolver.query(
+                Uri.parse("content://sms/inbox"), cols,
+                "date > ?", arrayOf(sinceMillis.toString()), "date ASC"
+            )
+        } catch (e: SecurityException) {
+            return ImportResult(0, 0, 0, emptyList(), "SMS permission not granted")
+        } ?: return ImportResult(0, 0, 0, emptyList(), "Cannot read the SMS inbox")
 
         val batch = mutableListOf<Triple<String, String, Long>>()
-        var sent = 0
+        val seen = linkedSetOf<String>()   // distinct senders, for the report
+        var scanned = 0; var matched = 0; var sent = 0
+
         cursor.use { c ->
             val iA = c.getColumnIndexOrThrow("address")
             val iB = c.getColumnIndexOrThrow("body")
             val iD = c.getColumnIndexOrThrow("date")
             while (c.moveToNext()) {
+                scanned++
                 val sender = c.getString(iA) ?: continue
+                seen.add(sender)
                 if (!isFinancial(sender)) continue
+                matched++
                 batch.add(Triple(sender, c.getString(iB) ?: "", c.getLong(iD)))
                 if (batch.size >= 100) {           // keep payloads small
                     if (post(ctx, batch)) sent += batch.size
@@ -102,6 +153,43 @@ object Forwarder {
         }
         if (batch.isNotEmpty() && post(ctx, batch)) sent += batch.size
         prefs(ctx).edit().putLong(KEY_LAST_IMPORT, System.currentTimeMillis()).apply()
-        return sent
+        return ImportResult(scanned, matched, sent, seen.toList())
+    }
+
+    /**
+     * Escape hatch: forward EVERY message from every sender, letting the
+     * server decide. Used when the allowlist misses a bank's sender id —
+     * the server rejects non-financial messages anyway.
+     */
+    fun importEverything(ctx: Context): ImportResult {
+        val cursor = try {
+            ctx.contentResolver.query(
+                Uri.parse("content://sms/inbox"),
+                arrayOf("address", "body", "date"), null, null, "date DESC"
+            )
+        } catch (e: SecurityException) {
+            return ImportResult(0, 0, 0, emptyList(), "SMS permission not granted")
+        } ?: return ImportResult(0, 0, 0, emptyList(), "Cannot read the SMS inbox")
+
+        val batch = mutableListOf<Triple<String, String, Long>>()
+        val seen = linkedSetOf<String>()
+        var scanned = 0; var sent = 0
+        cursor.use { c ->
+            val iA = c.getColumnIndexOrThrow("address")
+            val iB = c.getColumnIndexOrThrow("body")
+            val iD = c.getColumnIndexOrThrow("date")
+            while (c.moveToNext() && scanned < 2000) {
+                scanned++
+                val sender = c.getString(iA) ?: "unknown"
+                seen.add(sender)
+                batch.add(Triple(sender, c.getString(iB) ?: "", c.getLong(iD)))
+                if (batch.size >= 100) {
+                    if (post(ctx, batch)) sent += batch.size
+                    batch.clear()
+                }
+            }
+        }
+        if (batch.isNotEmpty() && post(ctx, batch)) sent += batch.size
+        return ImportResult(scanned, scanned, sent, seen.toList())
     }
 }

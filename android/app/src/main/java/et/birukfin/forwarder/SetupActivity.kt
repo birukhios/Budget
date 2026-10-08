@@ -78,8 +78,25 @@ class SetupActivity : Activity() {
             layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = 40 }
         })
         root.addView(Button(this).apply {
+            text = "Test connection"
+            setOnClickListener {
+                if (!save()) return@setOnClickListener
+                status.text = "Testing…"
+                thread {
+                    val r = Forwarder.testConnection(this@SetupActivity)
+                    runOnUiThread { status.text = r }
+                }
+            }
+            layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = 12 }
+        })
+        root.addView(Button(this).apply {
             text = "Import existing inbox"
-            setOnClickListener { if (save()) runImport() }
+            setOnClickListener { if (save()) runImport(false) }
+            layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = 12 }
+        })
+        root.addView(Button(this).apply {
+            text = "Import ALL messages (diagnostic)"
+            setOnClickListener { if (save()) runImport(true) }
             layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = 12 }
         })
         root.addView(Button(this).apply {
@@ -92,7 +109,7 @@ class SetupActivity : Activity() {
 
         status = TextView(this).apply {
             setTextColor(Color.parseColor("#3ddc97")); textSize = 13f
-            gravity = Gravity.CENTER_HORIZONTAL
+            gravity = Gravity.START
             setPadding(0, 32, 0, 0)
         }
         root.addView(status)
@@ -123,13 +140,14 @@ class SetupActivity : Activity() {
         else ActivityCompat.requestPermissions(this, need.toTypedArray(), 1)
     }
 
-    private fun runImport() {
+    private fun runImport(everything: Boolean) {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_SMS)
             != PackageManager.PERMISSION_GRANTED) { requestPerm(); return }
         status.text = "Importing…"
         thread {
-            val n = Forwarder.importInbox(this)
-            runOnUiThread { status.text = "Sent $n messages." }
+            val r = if (everything) Forwarder.importEverything(this)
+                    else Forwarder.importInbox(this)
+            runOnUiThread { status.text = r.toString() }
         }
     }
 
